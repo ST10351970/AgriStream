@@ -4,6 +4,7 @@ using Azure.Data.Tables;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Sas;
+using System.Globalization;
 
 namespace AgriStream.Web.Services;
 
@@ -97,7 +98,7 @@ public class DroneImageService
                 if (audit.HasValue && audit.Value is not null)
                 {
                     status = audit.Value.GetString("Status") ?? "Logged";
-                    processedAt = audit.Value.GetDateTimeOffset("ProcessedAtUtc");
+                    processedAt = ReadDateTime(audit.Value, "ProcessedAtUtc");
                 }
             }
             catch (RequestFailedException ex)
@@ -124,5 +125,20 @@ public class DroneImageService
         }
 
         return results;
+    }
+
+    private static DateTimeOffset? ReadDateTime(TableEntity entity, string key)
+    {
+        if (!entity.TryGetValue(key, out var value) || value is null)
+            return null;
+
+        return value switch
+        {
+            DateTimeOffset dto => dto,
+            DateTime dt => new DateTimeOffset(DateTime.SpecifyKind(dt, DateTimeKind.Utc)),
+            string s when DateTimeOffset.TryParse(s, CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var parsed) => parsed,
+            _ => null
+        };
     }
 }
