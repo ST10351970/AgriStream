@@ -1,9 +1,13 @@
 using AgriStream.Web.Data;
 using AgriStream.Web.Models.Entities;
+using AgriStream.Web.Services;
+using Azure.Data.Tables;
+using Azure.Storage.Blobs;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -20,6 +24,26 @@ builder.Services.AddDbContext<AgriStreamDbContext>(options =>
 
 builder.Services.AddScoped<IPasswordHasher<AppUser>, PasswordHasher<AppUser>>();
 
+// Azure Storage
+var storageConnection = builder.Configuration.GetConnectionString("AgriStreamStorage")
+    ?? throw new InvalidOperationException("Connection string 'AgriStreamStorage' is not configured.");
+
+builder.Services.AddSingleton(_ => new BlobServiceClient(storageConnection));
+builder.Services.AddSingleton(_ => new TableServiceClient(storageConnection));
+builder.Services.AddScoped<DroneImageService>();
+
+// HTTP-triggered Azure Functions client
+builder.Services.Configure<FunctionsOptions>(builder.Configuration.GetSection(FunctionsOptions.SectionName));
+builder.Services.AddHttpClient<FunctionsApiClient>((sp, client) =>
+{
+    var options = sp.GetRequiredService<IOptions<FunctionsOptions>>().Value;
+    if (!string.IsNullOrWhiteSpace(options.BaseUrl))
+        client.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + "/");
+    if (!string.IsNullOrWhiteSpace(options.Key))
+        client.DefaultRequestHeaders.Add("x-functions-key", options.Key);
+    client.Timeout = TimeSpan.FromSeconds(15);
+});
+
 // Cookie-based authentication
 builder.Services
     .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -35,7 +59,6 @@ builder.Services
         options.Cookie.SameSite = SameSiteMode.Lax;
     });
 
-// Secure by default. Pages require sign-in unless marked AllowAnonymous
 builder.Services.AddAuthorization(options =>
 {
     options.FallbackPolicy = new AuthorizationPolicyBuilder()

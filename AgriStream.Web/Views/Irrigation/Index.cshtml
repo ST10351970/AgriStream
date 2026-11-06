@@ -1,0 +1,61 @@
+﻿@model IrrigationViewModel
+@{
+    ViewData["Title"] = "Irrigation";
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+    <h1 class="h3 mb-0">Irrigation control</h1>
+    <form method="get" class="d-flex gap-2">
+        <select name="fieldId" class="form-select form-select-sm" onchange="this.form.submit()">
+            <option value="">All fields</option>
+            @foreach (var field in Model.Fields)
+            {
+                <option value="@field" selected="@(field == Model.SelectedField)">@field</option>
+            }
+        </select>
+    </form>
+</div>
+
+<p class="text-muted small">
+    Commands are sent to the HTTP POST Function, which places them on the
+    <code>@StorageNames.IrrigationQueue</code> queue. The Queue-triggered Function then updates the device registry in Azure SQL.
+</p>
+
+<div class="card shadow-sm">
+    <div class="table-responsive">
+        <table class="table align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Valve</th>
+                    <th>Field</th>
+                    <th>Status</th>
+                    <th>Last updated (UTC)</th>
+                    <th style="width:280px">Trigger irrigation</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var v in Model.Valves)
+                {
+                    var blocked = v.OperationalStatus is "Fault" or "Offline";
+                    <tr>
+                        <td><code>@v.DeviceId</code><div class="small text-muted">@v.DeviceName</div></td>
+                        <td>@v.FieldId</td>
+                        <td><span class="badge @(v.OperationalStatus == "Irrigating" ? "bg-primary" : blocked ? "bg-danger" : "bg-secondary")">@v.OperationalStatus</span></td>
+                        <td>@v.LastUpdatedUtc.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                        <td>
+                            <form asp-action="Trigger" method="post" class="d-flex gap-2">
+                                <input type="hidden" name="deviceId" value="@v.DeviceId" />
+                                <input type="hidden" name="fieldId" value="@Model.SelectedField" />
+                                <div class="input-group input-group-sm">
+                                    <input type="number" name="durationMinutes" value="30" min="1" max="240" class="form-control" aria-label="Minutes" />
+                                    <span class="input-group-text">min</span>
+                                </div>
+                                <button type="submit" class="btn btn-sm btn-primary text-nowrap" disabled="@blocked">💧 Start</button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

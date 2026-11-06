@@ -1,0 +1,115 @@
+﻿@model DroneUploadViewModel
+@{
+    ViewData["Title"] = "Drone images";
+
+    string StatusBadge(string status) => status switch
+    {
+        "Processed" => "bg-success",
+        "Rejected" => "bg-danger",
+        "Pending" => "bg-warning text-dark",
+        _ => "bg-secondary"
+    };
+}
+
+<h1 class="h3 mb-3">Drone imagery</h1>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <h2 class="h5">Upload aerial image</h2>
+        <p class="text-muted small mb-3">
+            Images go directly to Azure Blob Storage (container <code>@StorageNames.DroneImagesContainer</code>).
+            Max @(DroneImageNaming.MaxFileBytes / 1024 / 1024) MB - JPG, PNG, TIFF or WEBP.
+        </p>
+
+        <form asp-action="Upload" method="post" enctype="multipart/form-data" class="row g-3 align-items-end">
+            <div asp-validation-summary="ModelOnly" class="text-danger small col-12"></div>
+
+            <div class="col-md-3">
+                <label asp-for="FieldId" class="form-label"></label>
+                <select asp-for="FieldId" class="form-select">
+                    <option value="">-- Select field --</option>
+                    @foreach (var field in Model.Fields)
+                    {
+                        <option value="@field">@field</option>
+                    }
+                </select>
+                <span asp-validation-for="FieldId" class="text-danger small"></span>
+            </div>
+
+            <div class="col-md-6">
+                <label asp-for="File" class="form-label"></label>
+                <input asp-for="File" type="file" class="form-control" accept="image/*" />
+                <span asp-validation-for="File" class="text-danger small"></span>
+            </div>
+
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-success w-100">Upload</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<h2 class="h5">Recent uploads</h2>
+
+@if (Model.LoadError is not null)
+{
+    <div class="alert alert-warning">@Model.LoadError</div>
+}
+else if (!Model.RecentImages.Any())
+{
+    <p class="text-muted">No drone images uploaded yet.</p>
+}
+else
+{
+    <div class="card shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Preview</th>
+                        <th>Original name</th>
+                        <th>Field</th>
+                        <th>Uploaded by</th>
+                        <th>Size</th>
+                        <th>Uploaded (UTC)</th>
+                        <th>Pipeline status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var img in Model.RecentImages)
+                    {
+                        <tr>
+                            <td>
+                                @if (img.PreviewUrl is not null)
+                                {
+                                    <a href="@img.PreviewUrl" target="_blank" rel="noopener">
+                                        <img src="@img.PreviewUrl" alt="@img.OriginalName" style="height:56px;width:80px;object-fit:cover" class="rounded" />
+                                    </a>
+                                }
+                            </td>
+                            <td>
+                                @img.OriginalName
+                                <div class="small text-muted"><code>@img.BlobName</code></div>
+                            </td>
+                            <td>@img.FieldId</td>
+                            <td>@img.UploadedBy</td>
+                            <td>@((img.SizeBytes / 1024.0).ToString("N0")) KB</td>
+                            <td>@img.UploadedAt?.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                            <td>
+                                <span class="badge @StatusBadge(img.AuditStatus)">@img.AuditStatus</span>
+                                @if (img.ProcessedAt is not null)
+                                {
+                                    <div class="small text-muted">@img.ProcessedAt.Value.UtcDateTime.ToString("HH:mm:ss")</div>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

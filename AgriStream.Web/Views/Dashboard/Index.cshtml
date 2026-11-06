@@ -1,0 +1,132 @@
+﻿@model DashboardViewModel
+@{
+    ViewData["Title"] = "Field dashboard";
+    var canIrrigate = User.IsInRole(AppRoles.Farmer) || User.IsInRole(AppRoles.Admin);
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+    <h1 class="h3 mb-0">Field dashboard</h1>
+    <form method="get" class="d-flex gap-2">
+        <select name="fieldId" class="form-select form-select-sm" onchange="this.form.submit()">
+            @foreach (var field in Model.Fields)
+            {
+                <option value="@field" selected="@(field == Model.SelectedField)">@field</option>
+            }
+        </select>
+    </form>
+</div>
+
+@if (Model.Error is not null)
+{
+    <div class="alert alert-warning">@Model.Error</div>
+}
+else if (!Model.Readings.Any())
+{
+    <div class="alert alert-info">No telemetry received yet for @Model.SelectedField.</div>
+}
+else
+{
+    <p class="text-muted small">
+        Latest @Model.Readings.Count readings retrieved from Azure Table Storage via the HTTP GET Function
+        in <strong>@Model.FetchMilliseconds ms</strong>. Auto-refreshes every 30 seconds.
+    </p>
+
+    @if (Model.FieldIsDry)
+    {
+        <div class="alert alert-danger d-flex justify-content-between align-items-center">
+            <span>⚠ Soil moisture in @Model.SelectedField is below @DashboardViewModel.DryThresholdPercent% - irrigation recommended.</span>
+            @if (canIrrigate)
+            {
+                <a asp-controller="Irrigation" asp-action="Index" asp-route-fieldId="@Model.SelectedField" class="btn btn-sm btn-light">Trigger irrigation</a>
+            }
+        </div>
+    }
+
+    <div class="row g-3 mb-4">
+        @foreach (var r in Model.LatestBySensor)
+        {
+            var dry = r.SoilMoisturePercent < DashboardViewModel.DryThresholdPercent;
+            <div class="col-sm-6 col-lg-4">
+                <div class="card shadow-sm h-100 @(dry ? "border-danger" : "")">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <h2 class="h6 mb-2">@r.SensorId</h2>
+                            <span class="small text-muted">@r.TimestampUtc.ToString("HH:mm:ss") UTC</span>
+                        </div>
+                        <div class="display-6 @(dry ? "text-danger" : "text-success")">@r.SoilMoisturePercent.ToString("0.0")%</div>
+                        <div class="small text-muted">soil moisture</div>
+                        <hr class="my-2" />
+                        <div class="small">
+                            Soil @r.SoilTemperatureC.ToString("0.0") °C ·
+                            Air @r.AirTemperatureC.ToString("0.0") °C ·
+                            Humidity @r.HumidityPercent.ToString("0")%
+                            @if (r.SoilPh is not null)
+                            {
+                                <text> · pH @r.SoilPh.Value.ToString("0.0")</text>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h2 class="h6">Soil moisture trend</h2>
+            <canvas id="moistureChart" height="90"></canvas>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="table-responsive" style="max-height:400px">
+            <table class="table table-sm table-striped mb-0">
+                <thead class="table-light sticky-top">
+                    <tr>
+                        <th>Time (UTC)</th>
+                        <th>Sensor</th>
+                        <th>Moisture %</th>
+                        <th>Soil °C</th>
+                        <th>Air °C</th>
+                        <th>Humidity %</th>
+                        <th>pH</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var r in Model.Readings)
+                    {
+                        <tr>
+                            <td>@r.TimestampUtc.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                            <td>@r.SensorId</td>
+                            <td>@r.SoilMoisturePercent.ToString("0.0")</td>
+                            <td>@r.SoilTemperatureC.ToString("0.0")</td>
+                            <td>@r.AirTemperatureC.ToString("0.0")</td>
+                            <td>@r.HumidityPercent.ToString("0")</td>
+                            <td>@r.SoilPh?.ToString("0.0")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    @if (Model.Readings.Any())
+    {
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+        <script>
+            const labels = @Json.Serialize(Model.ChartLabels);
+            const series = @Json.Serialize(Model.ChartSeries);
+            new Chart(document.getElementById('moistureChart'), {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: series.map(s => ({ label: s.sensorId, data: s.values, spanGaps: true, tension: 0.3 }))
+                },
+                options: { scales: { y: { min: 0, max: 100, title: { display: true, text: '%' } } } }
+            });
+        </script>
+    }
+    <script>setTimeout(() => location.reload(), 30000);</script>
+}

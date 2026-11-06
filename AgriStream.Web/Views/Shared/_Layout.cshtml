@@ -22,6 +22,12 @@
                     {
                         <ul class="navbar-nav flex-grow-1">
                             <li class="nav-item"><a class="nav-link" asp-controller="Home" asp-action="Index">Home</a></li>
+                            <li class="nav-item"><a class="nav-link" asp-controller="Dashboard" asp-action="Index">Dashboard</a></li>
+                            <li class="nav-item"><a class="nav-link" asp-controller="DroneImages" asp-action="Index">Drone images</a></li>
+                            @if (User.IsInRole(AppRoles.Farmer) || User.IsInRole(AppRoles.Admin))
+                            {
+                                <li class="nav-item"><a class="nav-link" asp-controller="Irrigation" asp-action="Index">Irrigation</a></li>
+                            }
                             <li class="nav-item"><a class="nav-link" asp-controller="Devices" asp-action="Index">Devices</a></li>
                             @if (User.IsInRole(AppRoles.Admin))
                             {
@@ -49,6 +55,13 @@
             {
                 <div class="alert alert-success alert-dismissible fade show" role="alert">
                     @successMessage
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            }
+            @if (TempData["Error"] is string errorMessage)
+            {
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    @errorMessage
                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>
             }
