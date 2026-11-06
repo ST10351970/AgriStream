@@ -1,8 +1,35 @@
 ﻿@{
-    ViewData["Title"] = "Home Page";
+    ViewData["Title"] = "Home";
+    var displayName = User.FindFirst(ClaimTypes.GivenName)?.Value ?? User.Identity?.Name;
+    var role = User.FindFirst(ClaimTypes.Role)?.Value;
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+<div class="py-3">
+    <h1 class="h3">Welcome, @displayName</h1>
+    <p class="text-muted">Signed in as <strong>@role</strong>. AgriStream IoT farm monitoring platform.</p>
+</div>
+
+<div class="row g-3">
+    <div class="col-md-4">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body">
+                <h2 class="h5">Device registry</h2>
+                <p class="card-text text-muted">Irrigation valves and soil sensors with their live operational status.</p>
+                <a asp-controller="Devices" asp-action="Index" class="btn btn-success">View devices</a>
+            </div>
+        </div>
+    </div>
+
+    @if (User.IsInRole(AppRoles.Admin))
+    {
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <h2 class="h5">User management</h2>
+                    <p class="card-text text-muted">Create accounts and assign Farmer, Agronomist or Admin roles.</p>
+                    <a asp-controller="Users" asp-action="Index" class="btn btn-success">Manage users</a>
+                </div>
+            </div>
+        </div>
+    }
 </div>

@@ -1,9 +1,62 @@
+using AgriStream.Web.Data;
+using AgriStream.Web.Models.Entities;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 
+//Azure SQL (users, roles, device registry)
+var sqlConnection = builder.Configuration.GetConnectionString("AgriStreamSql")
+    ?? throw new InvalidOperationException("Connection string 'AgriStreamSql' is not configured.");
+
+builder.Services.AddDbContext<AgriStreamDbContext>(options =>
+    options.UseSqlServer(sqlConnection, sql =>
+        sql.EnableRetryOnFailure(5, TimeSpan.FromSeconds(10), null)));
+
+builder.Services.AddScoped<IPasswordHasher<AppUser>, PasswordHasher<AppUser>>();
+
+// Cookie-based authentication
+builder.Services
+    .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.LoginPath = "/Account/Login";
+        options.LogoutPath = "/Account/Logout";
+        options.AccessDeniedPath = "/Account/AccessDenied";
+        options.ExpireTimeSpan = TimeSpan.FromHours(8);
+        options.SlidingExpiration = true;
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        options.Cookie.SameSite = SameSiteMode.Lax;
+    });
+
+// Secure by default. Pages require sign-in unless marked AllowAnonymous
+builder.Services.AddAuthorization(options =>
+{
+    options.FallbackPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+});
+
 var app = builder.Build();
+
+// seed starter users
+using (var scope = app.Services.CreateScope())
+{
+    try
+    {
+        await DbSeeder.SeedAsync(scope.ServiceProvider);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Database seeding failed - check the AgriStreamSql connection string and SQL firewall.");
+    }
+}
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
@@ -18,10 +71,11 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
-app.Run();
+await app.RunAsync();

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using AgriStream.Web.Models;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 
 namespace AgriStream.Web.Controllers
 {
@@ -23,6 +24,7 @@ namespace AgriStream.Web.Controllers
             return View();
         }
 
+        [AllowAnonymous]
         [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
         public IActionResult Error()
         {

@@ -1,0 +1,93 @@
+﻿@model DevicesIndexViewModel
+@{
+    ViewData["Title"] = "Devices";
+
+    string StatusBadge(string status) => status switch
+    {
+        "Irrigating" => "bg-primary",
+        "Fault" => "bg-danger",
+        "Offline" => "bg-dark",
+        _ => "bg-secondary"
+    };
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 mb-0">Device registry</h1>
+    <form method="get" class="d-flex gap-2">
+        <select name="fieldId" class="form-select form-select-sm" onchange="this.form.submit()">
+            <option value="">All fields</option>
+            @foreach (var field in Model.Fields)
+            {
+                <option value="@field" selected="@(field == Model.SelectedField)">@field</option>
+            }
+        </select>
+    </form>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Device ID</th>
+                    <th>Name</th>
+                    <th>Field</th>
+                    <th>Type</th>
+                    <th>Status</th>
+                    <th>Last updated (UTC)</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var d in Model.Devices)
+                {
+                    <tr>
+                        <td><code>@d.DeviceId</code></td>
+                        <td>@d.DeviceName</td>
+                        <td>@d.FieldId</td>
+                        <td>@d.DeviceType</td>
+                        <td><span class="badge @StatusBadge(d.OperationalStatus)">@d.OperationalStatus</span></td>
+                        <td>@d.LastUpdatedUtc.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<h2 class="h5">Recent irrigation commands</h2>
+@if (!Model.RecentCommands.Any())
+{
+    <p class="text-muted">No irrigation commands processed yet.</p>
+}
+else
+{
+    <div class="card shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-sm mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Command</th>
+                        <th>Device</th>
+                        <th>Minutes</th>
+                        <th>Source</th>
+                        <th>Requested by</th>
+                        <th>Processed (UTC)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var c in Model.RecentCommands)
+                    {
+                        <tr>
+                            <td><code>@c.CommandId.ToString()[..8]</code></td>
+                            <td>@c.DeviceId</td>
+                            <td>@c.DurationMinutes</td>
+                            <td>@c.Source</td>
+                            <td>@c.RequestedBy</td>
+                            <td>@c.ProcessedAtUtc.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
